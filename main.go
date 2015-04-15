@@ -104,6 +104,15 @@ func JoinedHandler(s ircx.Sender, m *irc.Message) {
 	go untappdLoop(s)
 }
 
+func sendCheckinToIrc(checkin *untappd.Checkin, channel string, s ircx.Sender) {
+	message := formatCheckin(checkin)
+	s.Send(&irc.Message{
+		Command:  irc.PRIVMSG,
+		Params:   []string{channel},
+		Trailing: message,
+	})
+}
+
 func untappdLoop(s ircx.Sender) {
 	client, err := untappd.NewClient(
 		config.ClientId,
@@ -126,12 +135,7 @@ func untappdLoop(s ircx.Sender) {
 
 			for _, c := range checkins {
 				if isCheckinNew(c, lastCheckinTimes) {
-					message := formatCheckin(c)
-					s.Send(&irc.Message{
-						Command:  irc.PRIVMSG,
-						Params:   []string{config.Channel},
-						Trailing: message,
-					})
+					sendCheckinToIrc(c, config.Channel, s)
 				}
 			}
 
