@@ -165,7 +165,7 @@ func untappdLoop(s ircx.Sender) {
 	log.Printf("Polling interval: %d min", pollInterval)
 
 	// Channel for messages to be pushed to irc
-	ircMessages := make(chan string)
+	ircMessages := make(chan string, 30)
 	go pushMessage(s, ircMessages, config.Channel)
 
 	lastCheckinTimes := make(map[string]time.Time)
