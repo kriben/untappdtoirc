@@ -8,6 +8,7 @@ import (
 	"github.com/sorcix/irc"
 	"io/ioutil"
 	"log"
+	"sort"
 	"time"
 )
 
@@ -113,6 +114,13 @@ func sendCheckinToIrc(checkin *untappd.Checkin, channel string, s ircx.Sender) {
 	})
 }
 
+// byCheckinTime implements sort.Interface for []*untappd.Checkin.
+type byCheckinTime []*untappd.Checkin
+
+func (b byCheckinTime) Len() int               { return len(b) }
+func (b byCheckinTime) Less(i int, j int) bool { return b[i].Created.Before(b[j].Created) }
+func (b byCheckinTime) Swap(i int, j int)      { b[i], b[j] = b[j], b[i] }
+
 func untappdLoop(s ircx.Sender) {
 	client, err := untappd.NewClient(
 		config.ClientId,
@@ -133,15 +141,21 @@ func untappdLoop(s ircx.Sender) {
 				log.Fatal(err)
 			}
 
+			// Sort to get oldest checkin first
+			sort.Sort(byCheckinTime(checkins))
 			for _, c := range checkins {
+				// Print all new checkins since last poll
 				if isCheckinNew(c, lastCheckinTimes) {
 					sendCheckinToIrc(c, config.Channel, s)
 				}
 			}
 
+			// Keep track of the last checkin we have printed
 			if len(checkins) > 0 {
-				lastCheckinTimes[checkins[0].User.UserName] = checkins[0].Created
+				lastCheckin := checkins[len(checkins)-1]
+				lastCheckinTimes[lastCheckin.User.UserName] = lastCheckin.Created
 			}
+
 		}
 		time.Sleep(5 * time.Minute)
 	}
