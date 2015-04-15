@@ -52,15 +52,17 @@ func isCheckinNew(checkin *untappd.Checkin, lastCheckinTimes map[string]time.Tim
 	return checkin.Created.After(lastCheckinTime)
 }
 
-func formatCheckin(checkin *untappd.Checkin) string {
-	return fmt.Sprintf("untappd alert: %s had %s (%s). Style: %s Rating: %0.1f \"%s\"\n",
+func formatCheckin(checkin *untappd.Checkin) (string, string, string) {
+	generalInfo := fmt.Sprintf("untappd alert for %s: %s (%s).",
 		checkin.User.UserName,
 		checkin.Beer.Name,
-		checkin.Brewery.Name,
-		checkin.Beer.Style,
+		checkin.Brewery.Name)
+	styleInfo := fmt.Sprintf("  Style: %s   ABV: %0.1f%%",
+		checkin.Beer.Style, checkin.Beer.ABV)
+	ratingInfo := fmt.Sprintf("  Rating: %0.1f   %s\n",
 		checkin.UserRating,
-		checkin.Comment,
-	)
+		checkin.Comment)
+	return generalInfo, styleInfo, ratingInfo
 }
 
 func main() {
@@ -106,13 +108,30 @@ func JoinedHandler(s ircx.Sender, m *irc.Message) {
 	go untappdLoop(s)
 }
 
-func sendCheckinToIrc(checkin *untappd.Checkin, channel string, s ircx.Sender) {
-	message := formatCheckin(checkin)
-	s.Send(&irc.Message{
-		Command:  irc.PRIVMSG,
-		Params:   []string{channel},
-		Trailing: message,
-	})
+func pushMessage(s ircx.Sender, cs chan string, channelName string) {
+	// Avoid message flooding the irc server by waiting
+	// two seconds between messages
+	throttle := time.Tick(2 * time.Second)
+	for {
+		select {
+		case message := <-cs:
+			<-throttle
+			s.Send(&irc.Message{
+				Command:  irc.PRIVMSG,
+				Params:   []string{channelName},
+				Trailing: message,
+			})
+		default:
+		}
+	}
+}
+
+func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string) {
+	// Format the message and add it to the message channel
+	general, style, rating := formatCheckin(checkin)
+	cs <- general
+	cs <- style
+	cs <- rating
 }
 
 func calculatePollInterval(numUsers int) int {
@@ -145,6 +164,10 @@ func untappdLoop(s ircx.Sender) {
 	pollInterval := calculatePollInterval(len(config.Users))
 	log.Printf("Polling interval: %d min", pollInterval)
 
+	// Channel for messages to be pushed to irc
+	ircMessages := make(chan string)
+	go pushMessage(s, ircMessages, config.Channel)
+
 	lastCheckinTimes := make(map[string]time.Time)
 	for {
 		log.Printf("Checking %d users.\n", len(config.Users))
@@ -159,7 +182,7 @@ func untappdLoop(s ircx.Sender) {
 			for _, c := range checkins {
 				// Print all new checkins since last poll
 				if isCheckinNew(c, lastCheckinTimes) {
-					sendCheckinToIrc(c, config.Channel, s)
+					sendCheckinToIrc(c, ircMessages)
 				}
 			}
 
