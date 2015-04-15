@@ -134,6 +134,11 @@ func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string) {
 	cs <- rating
 }
 
+func logCheckin(checkin *untappd.Checkin) {
+	general, style, rating := formatCheckin(checkin)
+	log.Printf("%s  %s  %s", general, style, rating)
+}
+
 func calculatePollInterval(numUsers int) int {
 	// Untappd allows (only!) 100 api calls per hour
 	numApiCalls := 100
@@ -183,6 +188,7 @@ func untappdLoop(s ircx.Sender) {
 				// Print all new checkins since last poll
 				if isCheckinNew(c, lastCheckinTimes) {
 					sendCheckinToIrc(c, ircMessages)
+					logCheckin(c)
 				}
 			}
 
