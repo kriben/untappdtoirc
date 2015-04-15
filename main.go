@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/kriben/untappd"
+	"github.com/mdlayher/untappd"
 	"github.com/nickvanw/ircx"
 	"github.com/sorcix/irc"
 	"io/ioutil"
