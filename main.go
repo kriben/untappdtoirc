@@ -8,6 +8,7 @@ import (
 	"github.com/sorcix/irc"
 	"io/ioutil"
 	"log"
+	"math"
 	"sort"
 	"time"
 )
@@ -114,6 +115,15 @@ func sendCheckinToIrc(checkin *untappd.Checkin, channel string, s ircx.Sender) {
 	})
 }
 
+func calculatePollInterval(numUsers int) int {
+	// Untappd allows (only!) 100 api calls per hour
+	numApiCalls := 100
+	// Evenly distribute these calls for the different users
+	numCallsPerUser := float64(numApiCalls) / float64(numUsers)
+	// And round up to make sure we stay within the rate limit
+	return int(math.Ceil(60.0 / numCallsPerUser))
+}
+
 // byCheckinTime implements sort.Interface for []*untappd.Checkin.
 type byCheckinTime []*untappd.Checkin
 
@@ -131,6 +141,9 @@ func untappdLoop(s ircx.Sender) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	pollInterval := calculatePollInterval(len(config.Users))
+	log.Printf("Polling interval: %d min", pollInterval)
 
 	lastCheckinTimes := make(map[string]time.Time)
 	for {
@@ -157,6 +170,6 @@ func untappdLoop(s ircx.Sender) {
 			}
 
 		}
-		time.Sleep(5 * time.Minute)
+		time.Sleep(time.Duration(pollInterval) * time.Minute)
 	}
 }
