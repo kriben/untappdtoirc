@@ -52,17 +52,22 @@ func isCheckinNew(checkin *untappd.Checkin, lastCheckinTimes map[string]time.Tim
 	return checkin.Created.After(lastCheckinTime)
 }
 
-func formatCheckin(checkin *untappd.Checkin) (string, string, string) {
+func formatCheckin(checkin *untappd.Checkin) (string, string, string, string) {
 	generalInfo := fmt.Sprintf("untappd alert for %s: %s (%s).",
 		checkin.User.UserName,
 		checkin.Beer.Name,
 		checkin.Brewery.Name)
 	styleInfo := fmt.Sprintf("  Style: %s   ABV: %0.1f%%",
 		checkin.Beer.Style, checkin.Beer.ABV)
-	ratingInfo := fmt.Sprintf("  Rating: %0.1f   %s\n",
+	ratingInfo := fmt.Sprintf("  Rating: %0.1f   %s",
 		checkin.UserRating,
 		checkin.Comment)
-	return generalInfo, styleInfo, ratingInfo
+	venueInfo := ""
+	if checkin.Venue != nil {
+		venueInfo = fmt.Sprintf("  Venue: %s", checkin.Venue.Name)
+	}
+
+	return generalInfo, styleInfo, ratingInfo, venueInfo
 }
 
 func main() {
@@ -128,15 +133,18 @@ func pushMessage(s ircx.Sender, cs chan string, channelName string) {
 
 func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string) {
 	// Format the message and add it to the message channel
-	general, style, rating := formatCheckin(checkin)
+	general, style, rating, venue := formatCheckin(checkin)
 	cs <- general
 	cs <- style
 	cs <- rating
+	if venue != "" {
+		cs <- venue
+	}
 }
 
 func logCheckin(checkin *untappd.Checkin) {
-	general, style, rating := formatCheckin(checkin)
-	log.Printf("%s  %s  %s", general, style, rating)
+	general, style, rating, venue := formatCheckin(checkin)
+	log.Printf("%s  %s  %s  %s", general, style, rating, venue)
 }
 
 func calculatePollInterval(numUsers int) int {
