@@ -126,7 +126,6 @@ func pushMessage(s ircx.Sender, cs chan string, channelName string) {
 				Params:   []string{channelName},
 				Trailing: message,
 			})
-		default:
 		}
 	}
 }
