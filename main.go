@@ -140,13 +140,15 @@ func findBeer(id int, beers []*untappd.Beer) *untappd.Beer {
 	return nil
 }
 
-func updateBeers(checkin *untappd.Checkin, beers []*untappd.Beer) {
+func updateBeers(checkin *untappd.Checkin, beers []*untappd.Beer) []*untappd.Beer {
 	beer := findBeer(checkin.Beer.ID, beers)
 	if beer != nil {
-		beer = checkin.Beer
+		beer.Count = beer.Count + 1
+		beer.UserRating = checkin.UserRating
 	} else {
 		beers = append(beers, checkin.Beer)
 	}
+	return beers
 }
 
 func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userBeers map[string][]*untappd.Beer) {
@@ -258,7 +260,7 @@ func untappdLoop(s ircx.Sender) {
 				if isCheckinNew(c, lastCheckinTimes) {
 					sendCheckinToIrc(c, ircMessages, userBeers)
 					logCheckin(c)
-					updateBeers(c, userBeers[user.Name])
+					userBeers[user.Name] = updateBeers(c, userBeers[user.Name])
 				}
 			}
 
