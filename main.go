@@ -130,7 +130,17 @@ func pushMessage(s ircx.Sender, cs chan string, channelName string) {
 	}
 }
 
-func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string) {
+func findBeer(id int, beers []*untappd.Beer) *untappd.Beer {
+	for _, beer := range beers {
+		if id == beer.ID {
+			return beer
+		}
+	}
+
+	return nil
+}
+
+func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userBeers map[string][]*untappd.Beer) {
 	// Format the message and add it to the message channel
 	general, style, rating, venue := formatCheckin(checkin)
 	cs <- general
@@ -138,6 +148,16 @@ func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string) {
 	cs <- rating
 	if venue != "" {
 		cs <- venue
+	}
+
+	// Print ratings from the other users
+	for user, beers := range userBeers {
+		if user != checkin.User.UserName {
+			beer := findBeer(checkin.Beer.ID, beers)
+			if beer != nil {
+				cs <- fmt.Sprintf("    %s has rated this %0.1f (%dx)", user, beer.UserRating, beer.Count)
+			}
+		}
 	}
 }
 
@@ -180,6 +200,32 @@ func untappdLoop(s ircx.Sender) {
 	ircMessages := make(chan string, 30)
 	go pushMessage(s, ircMessages, config.Channel)
 
+	userBeers := make(map[string][]*untappd.Beer)
+	for _, user := range config.Users {
+		nBeers := 50
+		offset := 0
+		allBeers := make([]*untappd.Beer, 0)
+		beers, _, _ := client.User.BeersOffsetLimitSort(user.Name, offset, nBeers, untappd.SortDate)
+		for len(beers) > 0 {
+			allBeers = append(allBeers, beers...)
+			offset = offset + nBeers
+			beers, _, _ = client.User.BeersOffsetLimitSort(user.Name, offset, nBeers, untappd.SortDate)
+		}
+
+		userBeers[user.Name] = allBeers
+
+		// Generate some statistics for this user
+		totalRating := 0.0
+		for _, beer := range allBeers {
+			fmt.Printf("Beer: %d %s %f %d\n", beer.ID, beer.Name, beer.UserRating, beer.Count)
+			totalRating = totalRating + beer.UserRating
+		}
+		message := fmt.Sprintf("untappd stats for %s: %d uniques with %0.2f average rating.",
+			user.Name, len(allBeers), totalRating/float64(len(allBeers)))
+		ircMessages <- message
+		log.Println(message)
+	}
+
 	lastCheckinTimes := make(map[string]time.Time)
 	for {
 		log.Printf("Checking %d users.\n", len(config.Users))
@@ -195,7 +241,7 @@ func untappdLoop(s ircx.Sender) {
 			for _, c := range checkins {
 				// Print all new checkins since last poll
 				if isCheckinNew(c, lastCheckinTimes) {
-					sendCheckinToIrc(c, ircMessages)
+					sendCheckinToIrc(c, ircMessages, userBeers)
 					logCheckin(c)
 				}
 			}
