@@ -140,6 +140,15 @@ func findBeer(id int, beers []*untappd.Beer) *untappd.Beer {
 	return nil
 }
 
+func updateBeers(checkin *untappd.Checkin, beers []*untappd.Beer) {
+	beer := findBeer(checkin.Beer.ID, beers)
+	if beer != nil {
+		beer = checkin.Beer
+	} else {
+		beers = append(beers, checkin.Beer)
+	}
+}
+
 func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userBeers map[string][]*untappd.Beer) {
 	// Format the message and add it to the message channel
 	general, style, rating, venue := formatCheckin(checkin)
@@ -243,6 +252,7 @@ func untappdLoop(s ircx.Sender) {
 				if isCheckinNew(c, lastCheckinTimes) {
 					sendCheckinToIrc(c, ircMessages, userBeers)
 					logCheckin(c)
+					updateBeers(c, userBeers[user.Name])
 				}
 			}
 
