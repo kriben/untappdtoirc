@@ -233,7 +233,7 @@ func untappdLoop(s ircx.Sender) {
 			checkins, _, err := client.User.Checkins(user.Name)
 			if err != nil {
 				log.Println(err)
-				continue
+				break
 			}
 
 			// Sort to get oldest checkin first
