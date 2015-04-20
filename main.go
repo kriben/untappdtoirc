@@ -184,6 +184,20 @@ func calculatePollInterval(numUsers int) int {
 	return int(math.Ceil(60.0 / numCallsPerUser))
 }
 
+// Get all unique beers for a given user.
+func getAllBeers(userName string, client *untappd.Client) []*untappd.Beer {
+	nBeers := 50
+	offset := 0
+	allBeers := make([]*untappd.Beer, 0)
+	beers, _, _ := client.User.BeersOffsetLimitSort(userName, offset, nBeers, untappd.SortDate)
+	for len(beers) > 0 {
+		allBeers = append(allBeers, beers...)
+		offset = offset + nBeers
+		beers, _, _ = client.User.BeersOffsetLimitSort(userName, offset, nBeers, untappd.SortDate)
+	}
+	return allBeers
+}
+
 // byCheckinTime implements sort.Interface for []*untappd.Checkin.
 type byCheckinTime []*untappd.Checkin
 
@@ -209,22 +223,13 @@ func untappdLoop(s ircx.Sender) {
 	ircMessages := make(chan string, 30)
 	go pushMessage(s, ircMessages, config.Channel)
 
+	// Generate map of uniques for each user
 	userBeers := make(map[string][]*untappd.Beer)
 	for _, user := range config.Users {
-		nBeers := 50
-		offset := 0
-		allBeers := make([]*untappd.Beer, 0)
-		beers, _, _ := client.User.BeersOffsetLimitSort(user.Name, offset, nBeers, untappd.SortDate)
-		for len(beers) > 0 {
-			allBeers = append(allBeers, beers...)
-			offset = offset + nBeers
-			beers, _, _ = client.User.BeersOffsetLimitSort(user.Name, offset, nBeers, untappd.SortDate)
-		}
-
-		userBeers[user.Name] = allBeers
+		userBeers[user.Name] = getAllBeers(user.Name, client)
 	}
 
-	// Generate some statistics for this user
+	// Generate some statistics for all users
 	for user, beers := range userBeers {
 		totalRating := 0.0
 		for _, beer := range beers {
