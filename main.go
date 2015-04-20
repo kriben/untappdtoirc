@@ -222,15 +222,16 @@ func untappdLoop(s ircx.Sender) {
 		}
 
 		userBeers[user.Name] = allBeers
+	}
 
-		// Generate some statistics for this user
+	// Generate some statistics for this user
+	for user, beers := range userBeers {
 		totalRating := 0.0
-		for _, beer := range allBeers {
-			fmt.Printf("Beer: %d %s %f %d\n", beer.ID, beer.Name, beer.UserRating, beer.Count)
+		for _, beer := range beers {
 			totalRating = totalRating + beer.UserRating
 		}
 		message := fmt.Sprintf("untappd stats for %s: %d uniques with %0.2f average rating.",
-			user.Name, len(allBeers), totalRating/float64(len(allBeers)))
+			user, len(beers), totalRating/float64(len(beers)))
 		ircMessages <- message
 		log.Println(message)
 	}
