@@ -130,28 +130,7 @@ func pushMessage(s ircx.Sender, cs chan string, channelName string) {
 	}
 }
 
-func findBeer(id int, beers []*untappd.Beer) *untappd.Beer {
-	for _, beer := range beers {
-		if id == beer.ID {
-			return beer
-		}
-	}
-
-	return nil
-}
-
-func updateBeers(checkin *untappd.Checkin, beers []*untappd.Beer) []*untappd.Beer {
-	beer := findBeer(checkin.Beer.ID, beers)
-	if beer != nil {
-		beer.Count = beer.Count + 1
-		beer.UserRating = checkin.UserRating
-	} else {
-		beers = append(beers, checkin.Beer)
-	}
-	return beers
-}
-
-func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userBeers map[string][]*untappd.Beer) {
+func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userCheckins map[string][]*untappd.Checkin) {
 	// Format the message and add it to the message channel
 	general, style, rating, venue := formatCheckin(checkin)
 	cs <- general
@@ -162,11 +141,14 @@ func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userBeers map[st
 	}
 
 	// Print ratings from the other users
-	for user, beers := range userBeers {
+	for user, checkins := range userCheckins {
 		if user != checkin.User.UserName {
-			beer := findBeer(checkin.Beer.ID, beers)
-			if beer != nil {
-				cs <- fmt.Sprintf("    %s has rated this %0.1f (%dx)", user, beer.UserRating, beer.Count)
+			for _, oldCheckin := range checkins {
+				if oldCheckin.Beer.ID == checkin.Beer.ID {
+					created := time.Time.Format(oldCheckin.Created, "02 Jan 2006 15:04")
+					cs <- fmt.Sprintf("    %s rated this on %s: %0.1f  %s", user, created,
+						oldCheckin.UserRating, oldCheckin.Comment)
+				}
 			}
 		}
 	}
@@ -186,18 +168,18 @@ func calculatePollInterval(numUsers int) int {
 	return int(math.Ceil(60.0 / numCallsPerUser))
 }
 
-// Get all unique beers for a given user.
-func getAllBeers(userName string, client *untappd.Client) []*untappd.Beer {
-	nBeers := 50
-	offset := 0
-	allBeers := make([]*untappd.Beer, 0)
-	beers, _, _ := client.User.BeersOffsetLimitSort(userName, offset, nBeers, untappd.SortDate)
-	for len(beers) > 0 {
-		allBeers = append(allBeers, beers...)
-		offset = offset + nBeers
-		beers, _, _ = client.User.BeersOffsetLimitSort(userName, offset, nBeers, untappd.SortDate)
+// Get all checkins for a given user.
+func getAllCheckins(userName string, client *untappd.Client) []*untappd.Checkin {
+	nCheckins := 50
+	allCheckins := make([]*untappd.Checkin, 0)
+	checkins, _, _ := client.User.CheckinsMinMaxIDLimit(userName, 0, math.MaxInt32, nCheckins)
+
+	for len(checkins) > 0 {
+		allCheckins = append(allCheckins, checkins...)
+		previousMinId := checkins[len(checkins)-1].ID
+		checkins, _, _ = client.User.CheckinsMinMaxIDLimit(userName, 0, previousMinId, nCheckins)
 	}
-	return allBeers
+	return allCheckins
 }
 
 // byCheckinTime implements sort.Interface for []*untappd.Checkin.
@@ -225,20 +207,20 @@ func untappdLoop(s ircx.Sender) {
 	ircMessages := make(chan string, 30)
 	go pushMessage(s, ircMessages, config.Channel)
 
-	// Generate map of uniques for each user
-	userBeers := make(map[string][]*untappd.Beer)
+	// Generate map of checkins for each user
+	userCheckins := make(map[string][]*untappd.Checkin)
 	for _, user := range config.Users {
-		userBeers[user.Name] = getAllBeers(user.Name, client)
+		userCheckins[user.Name] = getAllCheckins(user.Name, client)
 	}
 
 	// Generate some statistics for all users
-	for user, beers := range userBeers {
+	for user, checkins := range userCheckins {
 		totalRating := 0.0
-		for _, beer := range beers {
-			totalRating = totalRating + beer.UserRating
+		for _, checkin := range checkins {
+			totalRating = totalRating + checkin.UserRating
 		}
-		message := fmt.Sprintf("untappd stats for %s: %d uniques with %0.2f average rating.",
-			user, len(beers), totalRating/float64(len(beers)))
+		message := fmt.Sprintf("untappd stats for %s: %d checkins with %0.2f average rating.",
+			user, len(checkins), totalRating/float64(len(checkins)))
 		ircMessages <- message
 		log.Println(message)
 	}
@@ -258,9 +240,9 @@ func untappdLoop(s ircx.Sender) {
 			for _, c := range checkins {
 				// Print all new checkins since last poll
 				if isCheckinNew(c, lastCheckinTimes) {
-					sendCheckinToIrc(c, ircMessages, userBeers)
+					sendCheckinToIrc(c, ircMessages, userCheckins)
 					logCheckin(c)
-					userBeers[user.Name] = updateBeers(c, userBeers[user.Name])
+					userCheckins[user.Name] = append(userCheckins[user.Name], c)
 				}
 			}
 
