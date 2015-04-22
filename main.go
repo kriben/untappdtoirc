@@ -11,6 +11,7 @@ import (
 	"math"
 	"sort"
 	"time"
+	"strconv"
 )
 
 type Config struct {
@@ -172,12 +173,24 @@ func calculatePollInterval(numUsers int) int {
 func getAllCheckins(userName string, client *untappd.Client) []*untappd.Checkin {
 	nCheckins := 50
 	allCheckins := make([]*untappd.Checkin, 0)
-	checkins, _, _ := client.User.CheckinsMinMaxIDLimit(userName, 0, math.MaxInt32, nCheckins)
+	checkins, res, _ := client.User.CheckinsMinMaxIDLimit(userName, 0, math.MaxInt32, nCheckins)
 
 	for len(checkins) > 0 {
 		allCheckins = append(allCheckins, checkins...)
 		previousMinId := checkins[len(checkins)-1].ID
-		checkins, _, _ = client.User.CheckinsMinMaxIDLimit(userName, 0, previousMinId, nCheckins)
+
+		// Slow down if number of remaining api calls is low
+		rateLimit, _ := strconv.Atoi(res.Header["X-Ratelimit-Remaining"][0])
+		if rateLimit < 10 {
+			log.Printf("Getting close to rate limit. Remaining calls: %d.", rateLimit)
+		}
+
+		if rateLimit < 2 {
+			log.Printf("Hit rate limit: sleeping 2 minutes.")
+			time.Sleep(2 * time.Minute)
+		}
+
+		checkins, res, _ = client.User.CheckinsMinMaxIDLimit(userName, 0, previousMinId, nCheckins)
 	}
 	return allCheckins
 }
