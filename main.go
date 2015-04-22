@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/jpillora/backoff"
 	"github.com/mdlayher/untappd"
 	"github.com/nickvanw/ircx"
 	"github.com/sorcix/irc"
@@ -11,7 +12,6 @@ import (
 	"math"
 	"sort"
 	"time"
-	"strconv"
 )
 
 type Config struct {
@@ -172,26 +172,36 @@ func calculatePollInterval(numUsers int) int {
 // Get all checkins for a given user.
 func getAllCheckins(userName string, client *untappd.Client) []*untappd.Checkin {
 	nCheckins := 50
+	maxId := math.MaxInt32
 	allCheckins := make([]*untappd.Checkin, 0)
-	checkins, res, _ := client.User.CheckinsMinMaxIDLimit(userName, 0, math.MaxInt32, nCheckins)
 
-	for len(checkins) > 0 {
-		allCheckins = append(allCheckins, checkins...)
-		previousMinId := checkins[len(checkins)-1].ID
-
-		// Slow down if number of remaining api calls is low
-		rateLimit, _ := strconv.Atoi(res.Header["X-Ratelimit-Remaining"][0])
-		if rateLimit < 10 {
-			log.Printf("Getting close to rate limit. Remaining calls: %d.", rateLimit)
-		}
-
-		if rateLimit < 2 {
-			log.Printf("Hit rate limit: sleeping 2 minutes.")
-			time.Sleep(2 * time.Minute)
-		}
-
-		checkins, res, _ = client.User.CheckinsMinMaxIDLimit(userName, 0, previousMinId, nCheckins)
+	b := &backoff.Backoff{
+		Min:    60 * time.Second,
+		Max:    30 * time.Minute,
+		Factor: 2,
+		Jitter: true,
 	}
+
+	for {
+		checkins, _, err := client.User.CheckinsMinMaxIDLimit(userName, 0, maxId, nCheckins)
+		if err != nil {
+			d := b.Duration()
+			log.Printf("%s, retrying in %s", err, d)
+			time.Sleep(d)
+			continue
+		}
+
+		//connected
+		b.Reset()
+
+		if len(checkins) == 0 {
+			return allCheckins
+		}
+
+		allCheckins = append(allCheckins, checkins...)
+		maxId = checkins[len(checkins)-1].ID
+	}
+
 	return allCheckins
 }
 
