@@ -142,11 +142,13 @@ func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userCheckins map
 	// Print ratings from the other users
 	for user, checkins := range userCheckins {
 		if user != checkin.User.UserName {
-			for _, oldCheckin := range checkins {
+			for i := len(checkins)-1; i >= 0; i-- {
+				oldCheckin := checkins[i]
 				if oldCheckin.Beer.ID == checkin.Beer.ID {
 					created := time.Time.Format(oldCheckin.Created, "02 Jan 2006 15:04")
 					cs <- fmt.Sprintf("    %s rated this on %s: %0.1f  %s", user, created,
 						oldCheckin.UserRating, oldCheckin.Comment)
+					break;
 				}
 			}
 		}
