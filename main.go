@@ -142,13 +142,13 @@ func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userCheckins map
 	// Print ratings from the other users
 	for user, checkins := range userCheckins {
 		if user != checkin.User.UserName {
-			for i := len(checkins)-1; i >= 0; i-- {
+			for i := len(checkins) - 1; i >= 0; i-- {
 				oldCheckin := checkins[i]
 				if oldCheckin.Beer.ID == checkin.Beer.ID {
 					created := time.Time.Format(oldCheckin.Created, "02 Jan 2006 15:04")
 					cs <- fmt.Sprintf("    %s rated this on %s: %0.1f  %s", user, created,
 						oldCheckin.UserRating, oldCheckin.Comment)
-					break;
+					break
 				}
 			}
 		}
@@ -205,6 +205,29 @@ func getAllCheckins(userName string, client *untappd.Client) []*untappd.Checkin 
 	return allCheckins
 }
 
+func getCheckins(userName string, client *untappd.Client) []*untappd.Checkin {
+	b := &backoff.Backoff{
+		Min:    60 * time.Second,
+		Max:    30 * time.Minute,
+		Factor: 2,
+		Jitter: true,
+	}
+
+	for {
+		checkins, _, err := client.User.Checkins(userName)
+		if err != nil {
+			d := b.Duration()
+			log.Printf("%s, retrying in %s", err, d)
+			time.Sleep(d)
+			continue
+		} else {
+			return checkins
+		}
+	}
+
+	return nil
+}
+
 // byCheckinTime implements sort.Interface for []*untappd.Checkin.
 type byCheckinTime []*untappd.Checkin
 
@@ -248,25 +271,10 @@ func untappdLoop(s ircx.Sender) {
 		log.Println(message)
 	}
 
-	b := &backoff.Backoff{
-		Min:    60 * time.Second,
-		Max:    30 * time.Minute,
-		Factor: 2,
-		Jitter: true,
-	}
-
 	for {
 		log.Printf("Checking %d users.\n", len(config.Users))
 		for _, user := range config.Users {
-			checkins, _, err := client.User.Checkins(user.Name)
-			if err != nil {
-				d := b.Duration()
-				log.Printf("%s, retrying in %s", err, d)
-				time.Sleep(d)
-				continue
-			}
-
-			b.Reset()
+			checkins := getCheckins(user.Name, client)
 
 			// Sort to get oldest checkin first
 			sort.Sort(byCheckinTime(checkins))
