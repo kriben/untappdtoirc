@@ -271,9 +271,9 @@ func untappdLoop(s ircx.Sender) {
 			for _, c := range checkins {
 				// Print all new checkins since last poll
 				if isCheckinNew(c, userCheckins[user.Name]) {
+					userCheckins[user.Name] = append(userCheckins[user.Name], c)
 					sendCheckinToIrc(c, ircMessages, userCheckins)
 					logCheckin(c)
-					userCheckins[user.Name] = append(userCheckins[user.Name], c)
 				}
 			}
 		}
