@@ -41,16 +41,14 @@ func readConfigFile(fileName string) (Config, error) {
 	return root, nil
 }
 
-func isCheckinNew(checkin *untappd.Checkin, lastCheckinTimes map[string]time.Time) bool {
-	lastCheckinTime, ok := lastCheckinTimes[checkin.User.UserName]
-
-	// User will not be in the map on first iteration: treat these
-	// as old to avoid repeating old checkins when program starts
-	if ok == false {
-		return false
+func isCheckinNew(checkin *untappd.Checkin, checkins []*untappd.Checkin) bool {
+	for _, c := range checkins {
+		if c.ID == checkin.ID {
+			return false
+		}
 	}
 
-	return checkin.Created.After(lastCheckinTime)
+	return true
 }
 
 func formatCheckin(checkin *untappd.Checkin) (string, string, string, string) {
@@ -248,7 +246,6 @@ func untappdLoop(s ircx.Sender) {
 		log.Println(message)
 	}
 
-	lastCheckinTimes := make(map[string]time.Time)
 	b := &backoff.Backoff{
 		Min:    60 * time.Second,
 		Max:    30 * time.Minute,
@@ -273,19 +270,12 @@ func untappdLoop(s ircx.Sender) {
 			sort.Sort(byCheckinTime(checkins))
 			for _, c := range checkins {
 				// Print all new checkins since last poll
-				if isCheckinNew(c, lastCheckinTimes) {
+				if isCheckinNew(c, userCheckins[user.Name]) {
 					sendCheckinToIrc(c, ircMessages, userCheckins)
 					logCheckin(c)
 					userCheckins[user.Name] = append(userCheckins[user.Name], c)
 				}
 			}
-
-			// Keep track of the last checkin we have printed
-			if len(checkins) > 0 {
-				lastCheckin := checkins[len(checkins)-1]
-				lastCheckinTimes[lastCheckin.User.UserName] = lastCheckin.Created
-			}
-
 		}
 		time.Sleep(time.Duration(pollInterval) * time.Minute)
 	}
