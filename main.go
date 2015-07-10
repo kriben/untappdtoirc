@@ -249,14 +249,25 @@ func untappdLoop(s ircx.Sender) {
 	}
 
 	lastCheckinTimes := make(map[string]time.Time)
+	b := &backoff.Backoff{
+		Min:    60 * time.Second,
+		Max:    30 * time.Minute,
+		Factor: 2,
+		Jitter: true,
+	}
+
 	for {
 		log.Printf("Checking %d users.\n", len(config.Users))
 		for _, user := range config.Users {
 			checkins, _, err := client.User.Checkins(user.Name)
 			if err != nil {
-				log.Println(err)
-				break
+				d := b.Duration()
+				log.Printf("%s, retrying in %s", err, d)
+				time.Sleep(d)
+				continue
 			}
+
+			b.Reset()
 
 			// Sort to get oldest checkin first
 			sort.Sort(byCheckinTime(checkins))
