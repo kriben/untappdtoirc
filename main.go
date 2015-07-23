@@ -11,6 +11,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,7 @@ type User struct {
 }
 
 var config Config
+var once sync.Once
 
 func readConfigFile(fileName string) (Config, error) {
 	body, err := ioutil.ReadFile(fileName)
@@ -109,7 +111,12 @@ func PingHandler(s ircx.Sender, m *irc.Message) {
 
 func JoinedHandler(s ircx.Sender, m *irc.Message) {
 	log.Printf("Joined channel %s.", config.Channel)
-	go untappdLoop(s)
+	untappdFunc := func() {
+		log.Printf("Starting untappd event loop.")
+		go untappdLoop(s)
+	}
+
+	once.Do(untappdFunc)
 }
 
 func pushMessage(s ircx.Sender, cs chan string, channelName string) {
