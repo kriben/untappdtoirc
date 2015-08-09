@@ -22,6 +22,8 @@ type Config struct {
 	BotName      string `json:"bot_name"`
 	Server       string
 	Channel      string
+	TimeZone     string `json:"time_zone"`
+	Location     *time.Location
 }
 
 type User struct {
@@ -36,6 +38,11 @@ func readConfigFile(fileName string) (Config, error) {
 
 	var root Config
 	err = json.Unmarshal(body, &root)
+	if err != nil {
+		return root, err
+	}
+
+	root.Location, err = time.LoadLocation(root.TimeZone)
 	if err != nil {
 		return root, err
 	}
@@ -152,7 +159,8 @@ func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userCheckins map
 			for i := len(checkins) - 1; i >= 0; i-- {
 				oldCheckin := checkins[i]
 				if oldCheckin.Beer.ID == checkin.Beer.ID {
-					created := time.Time.Format(oldCheckin.Created, "02 Jan 2006 15:04")
+					localTime := time.Time.In(oldCheckin.Created, config.Location)
+					created := time.Time.Format(localTime, "02 Jan 2006 15:04")
 					cs <- fmt.Sprintf("    %s rated this on %s: %0.1f  %s", user, created,
 						oldCheckin.UserRating, oldCheckin.Comment)
 					break
