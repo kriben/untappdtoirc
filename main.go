@@ -143,6 +143,31 @@ func pushMessage(s ircx.Sender, cs chan string, channelName string) {
 	}
 }
 
+func getStats(checkins []*untappd.Checkin, beer *untappd.Beer) (float64, float64, float64, int32, *untappd.Checkin) {
+	var min float64 = math.MaxFloat64
+	var max float64 = -math.MaxFloat64
+	var total float64 = 0.0
+	var count int32 = 0
+	var lastCheckin *untappd.Checkin = nil
+	for _, oldCheckin := range checkins {
+		if oldCheckin.Beer.ID == beer.ID {
+			if lastCheckin == nil || oldCheckin.ID > lastCheckin.ID {
+				lastCheckin = oldCheckin
+			}
+			if oldCheckin.UserRating < min {
+				min = oldCheckin.UserRating
+			}
+			if oldCheckin.UserRating > max {
+				max = oldCheckin.UserRating
+			}
+			total = total + oldCheckin.UserRating
+			count = count + 1
+		}
+	}
+
+	return min, max, total / float64(count), count, lastCheckin
+}
+
 func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userCheckins map[string][]*untappd.Checkin) {
 	// Format the message and add it to the message channel
 	general, style, rating, venue := formatCheckin(checkin)
@@ -156,15 +181,17 @@ func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userCheckins map
 	// Print ratings from the other users
 	for user, checkins := range userCheckins {
 		if user != checkin.User.UserName {
-			for i := len(checkins) - 1; i >= 0; i-- {
-				oldCheckin := checkins[i]
-				if oldCheckin.Beer.ID == checkin.Beer.ID {
-					localTime := time.Time.In(oldCheckin.Created, config.Location)
-					created := time.Time.Format(localTime, "02 Jan 2006 15:04")
-					cs <- fmt.Sprintf("    %s rated this on %s: %0.1f  %s", user, created,
-						oldCheckin.UserRating, oldCheckin.Comment)
-					break
+			min, max, avg, count, lastCheckin := getStats(checkins, checkin.Beer)
+			if lastCheckin != nil {
+				localTime := time.Time.In(lastCheckin.Created, config.Location)
+				created := time.Time.Format(localTime, "02 Jan 2006 15:04")
+				stats := ""
+				if count > 1 {
+					stats = fmt.Sprintf("[%0.1f-%0.1f] %0.1f #%d",
+						min, max, avg, count)
 				}
+				cs <- fmt.Sprintf("    %s rated this on %s: %0.1f  %s  %s", user, created,
+					lastCheckin.UserRating, lastCheckin.Comment, stats)
 			}
 		}
 	}
