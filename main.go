@@ -301,6 +301,7 @@ func untappdLoop(s ircx.Sender) {
 					logCheckin(c)
 				}
 			}
+			sort.Sort(byCheckinTime(userCheckins[user.Name]))
 		}
 		time.Sleep(time.Duration(pollInterval) * time.Minute)
 	}
