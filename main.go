@@ -91,14 +91,14 @@ func main() {
 	}
 
 	RegisterHandlers(bot)
-	bot.CallbackLoop()
+	bot.HandleLoop()
 	log.Println("Exiting..")
 }
 
 func RegisterHandlers(bot *ircx.Bot) {
-	bot.AddCallback(irc.RPL_WELCOME, ircx.Callback{Handler: ircx.HandlerFunc(RegisterConnect)})
-	bot.AddCallback(irc.PING, ircx.Callback{Handler: ircx.HandlerFunc(PingHandler)})
-	bot.AddCallback(irc.RPL_NAMREPLY, ircx.Callback{Handler: ircx.HandlerFunc(JoinedHandler)})
+	bot.HandleFunc(irc.RPL_WELCOME, RegisterConnect)
+	bot.HandleFunc(irc.PING, PingHandler)
+	bot.HandleFunc(irc.RPL_NAMREPLY, JoinedHandler)
 }
 
 func RegisterConnect(s ircx.Sender, m *irc.Message) {
