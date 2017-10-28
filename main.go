@@ -180,17 +180,19 @@ func sendCheckinToIrc(checkin *untappd.Checkin, cs chan string, userCheckins map
 
 	// Print ratings from the other users
 	for user, checkins := range userCheckins {
-		min, max, avg, count, lastCheckin := getStats(checkins, checkin.Beer)
-		if lastCheckin != nil {
-			localTime := time.Time.In(lastCheckin.Created, config.Location)
-			created := time.Time.Format(localTime, "02 Jan 2006 15:04")
-			stats := ""
-			if count > 1 {
-				stats = fmt.Sprintf("[%0.1f-%0.1f] %0.1f #%d",
-					min, max, avg, count)
+		if user != checkin.User.UserName {
+			min, max, avg, count, lastCheckin := getStats(checkins, checkin.Beer)
+			if lastCheckin != nil {
+				localTime := time.Time.In(lastCheckin.Created, config.Location)
+				created := time.Time.Format(localTime, "02 Jan 2006 15:04")
+				stats := ""
+				if count > 1 {
+					stats = fmt.Sprintf("[%0.1f-%0.1f] %0.1f #%d",
+						min, max, avg, count)
+				}
+				cs <- fmt.Sprintf("    %s rated this on %s: %0.1f  %s  %s", user, created,
+					lastCheckin.UserRating, lastCheckin.Comment, stats)
 			}
-			cs <- fmt.Sprintf("    %s rated this on %s: %0.1f  %s  %s", user, created,
-				lastCheckin.UserRating, lastCheckin.Comment, stats)
 		}
 	}
 }
