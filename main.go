@@ -90,6 +90,7 @@ func main() {
 	}
 
 	bot := ircx.Classic(config.Server, config.BotName)
+	bot.Config.MaxRetries = 10
 	if err := bot.Connect(); err != nil {
 		log.Panicln("Unable to dial IRC Server ", err)
 	}
