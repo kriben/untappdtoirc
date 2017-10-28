@@ -33,6 +33,10 @@ type User struct {
 var config Config
 var once sync.Once
 
+// The untappd api limits how many checkins you can query on other users.
+// Limit is 300 at the moment.
+const CheckinApiLimit int = 300
+
 func readConfigFile(fileName string) (Config, error) {
 	body, err := ioutil.ReadFile(fileName)
 
@@ -211,8 +215,17 @@ func calculatePollInterval(numUsers int) int {
 	return int(math.Ceil(60.0 / numCallsPerUser))
 }
 
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
+
 // Get all checkins for a given user.
 func getAllCheckins(userName string, client *untappd.Client) []*untappd.Checkin {
+	log.Printf("Getting checkins for %s", userName)
+
 	nCheckins := 50
 	maxId := math.MaxInt32
 	allCheckins := make([]*untappd.Checkin, 0)
@@ -225,7 +238,16 @@ func getAllCheckins(userName string, client *untappd.Client) []*untappd.Checkin 
 	}
 
 	for {
-		checkins, _, err := client.User.CheckinsMinMaxIDLimit(userName, 0, maxId, nCheckins)
+		if len(allCheckins) >= CheckinApiLimit {
+			log.Printf("Api limit reached for %s.", userName)
+			return allCheckins
+		}
+
+		// The untappd api only allows you to get the lastest 300 checkins
+		// for other users (for non-obvious reasons).
+		limit := min(CheckinApiLimit-len(allCheckins), nCheckins)
+		log.Printf("Getting %d checkins %d through %d. Number of checkins: %d", limit, 0, maxId, len(allCheckins))
+		checkins, _, err := client.User.CheckinsMinMaxIDLimit(userName, 0, maxId, limit)
 		if err != nil {
 			d := b.Duration()
 			log.Printf("%s, retrying in %s", err, d)
@@ -236,6 +258,7 @@ func getAllCheckins(userName string, client *untappd.Client) []*untappd.Checkin 
 		//connected
 		b.Reset()
 
+		log.Printf("Got %d checkins (%s, %d)", len(checkins), userName, maxId)
 		if len(checkins) == 0 {
 			return allCheckins
 		}
@@ -302,6 +325,9 @@ func untappdLoop(s ircx.Sender) {
 	}
 
 	// Generate some statistics for all users
+	message := fmt.Sprintf("Statistics for up to %d checkins (untappd api limit).",
+		CheckinApiLimit)
+	ircMessages <- message
 	for user, checkins := range userCheckins {
 		totalRating := 0.0
 		for _, checkin := range checkins {
