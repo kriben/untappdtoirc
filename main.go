@@ -91,6 +91,7 @@ func main() {
 
 	bot := ircx.WithTLS(config.Server, config.BotName, nil)
 	bot.Config.MaxRetries = 10
+	bot.SetLogger(bot.Logger())
 	if err := bot.Connect(); err != nil {
 		log.Fatal("Unable to dial IRC Server ", err)
 	}
