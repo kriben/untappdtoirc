@@ -351,7 +351,7 @@ func untappdLoop(s ircx.Sender) {
 	for user, checkins := range userCheckins {
 
 		count, avg, stdev := getUserStats(checkins)
-		message := fmt.Sprintf("untappd stats for %s: %d checkins with %0.2f average rating [stdev: %0.2f)].",
+		message := fmt.Sprintf("untappd stats for %s: %d checkins with %0.2f average rating [stdev: %0.2f].",
 			user, count, avg, stdev)
 		ircMessages <- message
 		log.Println(message)
