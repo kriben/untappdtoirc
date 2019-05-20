@@ -295,6 +295,24 @@ func getCheckins(userName string, client *untappd.Client) []*untappd.Checkin {
 	return nil
 }
 
+func getUserStats(checkins []*untappd.Checkin) (int, float64, float64) {
+	var mean, stdev float64
+	var count int = len(checkins)
+
+	sum := 0.0
+	for _, checkin := range checkins {
+		sum = sum + checkin.UserRating
+	}
+	mean = sum / float64(count)
+
+	for _, checkin := range checkins {
+		stdev += math.Pow(checkin.UserRating-mean, 2)
+	}
+
+	stdev = math.Sqrt(stdev / float64(count))
+	return count, mean, stdev
+}
+
 // byCheckinTime implements sort.Interface for []*untappd.Checkin.
 type byCheckinTime []*untappd.Checkin
 
@@ -331,12 +349,10 @@ func untappdLoop(s ircx.Sender) {
 		CheckinApiLimit)
 	ircMessages <- message
 	for user, checkins := range userCheckins {
-		totalRating := 0.0
-		for _, checkin := range checkins {
-			totalRating = totalRating + checkin.UserRating
-		}
-		message := fmt.Sprintf("untappd stats for %s: %d checkins with %0.2f average rating.",
-			user, len(checkins), totalRating/float64(len(checkins)))
+
+		count, avg, stdev := getUserStats(checkins)
+		message := fmt.Sprintf("untappd stats for %s: %d checkins with %0.2f average rating [stdev: %0.2f)].",
+			user, count, avg, stdev)
 		ircMessages <- message
 		log.Println(message)
 	}
