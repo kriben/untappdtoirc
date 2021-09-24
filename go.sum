@@ -1,0 +1,17 @@
+github.com/go-kit/kit v0.8.0 h1:Wz+5lgoB0kkuqLEc6NVmwRknTKP6dTGbSqvhZtBI/j0=
+github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
+github.com/go-logfmt/logfmt v0.4.0 h1:MP4Eh7ZCb31lleYCFuwm0oe4/YGak+5l1vA2NOE80nA=
+github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V4qmtdjCk=
+github.com/go-stack/stack v1.8.0 h1:5SgMzNM5HxrEjV0ww2lTmX6E2Izsfxas4+YHWRs3Lsk=
+github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
+github.com/jpillora/backoff v1.0.0 h1:uvFg412JmmHBHw7iwprIxkPMI+sGQ4kzOWsMeHnm2EA=
+github.com/jpillora/backoff v1.0.0/go.mod h1:J/6gKK9jxlEcS3zixgDgUAsiuZ7yrSoa/FX5e0EB2j4=
+github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515 h1:T+h1c/A9Gawja4Y9mFVWj2vyii2bbUNDw3kt9VxK2EY=
+github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
+github.com/mdlayher/untappd v0.0.0-20200131153647-e8eec0d2d578 h1:09KnTuNgEtOQ7bM0G5BER2Xl7M/2mmyFM3Nb/GtaMj0=
+github.com/mdlayher/untappd v0.0.0-20200131153647-e8eec0d2d578/go.mod h1:ibLeI+PzBzfUlwQAeVOMpX+1NFRh8+NWm+5GQPlyQdM=
+github.com/nickvanw/ircx/v2 v2.0.0 h1:0vOFSCZFiHgUKlShuYCp1Bw86elezcnyZWUZ+Tpf2Aw=
+github.com/nickvanw/ircx/v2 v2.0.0/go.mod h1:wRLSLjRgOMBY9pFYv6PYYN5BiVA72CcHH7NjGm9y468=
+gopkg.in/sorcix/irc.v2 v2.0.0-20180626144439-63eed78b082d/go.mod h1:9LLe1SvUK2YoWyIuJ+AParKHhu749G8oM+HTQQMZz9E=
+gopkg.in/sorcix/irc.v2 v2.0.0-20200812151606-3f15758ea8c7 h1:XS4tmz0w7EYviIrBpFVww8IyKJQiIX5SU/1ptPVtBWI=
+gopkg.in/sorcix/irc.v2 v2.0.0-20200812151606-3f15758ea8c7/go.mod h1:PmJkUcwbuPi1FiZ9Rarr6wzVMvzkO7uWqH1jwrMkgW0=

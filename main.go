@@ -3,16 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/jpillora/backoff"
-	"github.com/mdlayher/untappd"
-	"github.com/nickvanw/ircx"
-	"github.com/sorcix/irc"
 	"io/ioutil"
 	"log"
 	"math"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/jpillora/backoff"
+	"github.com/mdlayher/untappd"
+	"github.com/nickvanw/ircx/v2"
+	irc "gopkg.in/sorcix/irc.v2"
 )
 
 type Config struct {
@@ -116,9 +117,8 @@ func RegisterConnect(s ircx.Sender, m *irc.Message) {
 
 func PingHandler(s ircx.Sender, m *irc.Message) {
 	s.Send(&irc.Message{
-		Command:  irc.PONG,
-		Params:   m.Params,
-		Trailing: m.Trailing,
+		Command: irc.PONG,
+		Params:  m.Params,
 	})
 }
 
@@ -141,9 +141,8 @@ func pushMessage(s ircx.Sender, cs chan string, channelName string) {
 		case message := <-cs:
 			<-throttle
 			s.Send(&irc.Message{
-				Command:  irc.PRIVMSG,
-				Params:   []string{channelName},
-				Trailing: message,
+				Command: irc.PRIVMSG,
+				Params:  []string{channelName, message},
 			})
 		}
 	}
@@ -268,8 +267,6 @@ func getAllCheckins(userName string, client *untappd.Client) []*untappd.Checkin 
 		allCheckins = append(allCheckins, checkins...)
 		maxId = checkins[len(checkins)-1].ID
 	}
-
-	return allCheckins
 }
 
 func getCheckins(userName string, client *untappd.Client) []*untappd.Checkin {
