@@ -7,7 +7,6 @@ import (
 	"log"
 	"math"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/jpillora/backoff"
@@ -32,7 +31,6 @@ type User struct {
 }
 
 var config Config
-var once sync.Once
 
 // The untappd api limits how many checkins you can query on other users.
 // Limit is 300 at the moment.
@@ -98,6 +96,12 @@ func main() {
 	}
 
 	RegisterHandlers(bot)
+
+	// Channel for messages to be pushed to irc
+	ircMessages := make(chan string, 30)
+	go pushMessage(bot, ircMessages, config.Channel)
+	go untappdLoop(ircMessages)
+
 	bot.HandleLoop()
 	log.Println("Exiting..")
 }
@@ -124,15 +128,9 @@ func PingHandler(s ircx.Sender, m *irc.Message) {
 
 func JoinedHandler(s ircx.Sender, m *irc.Message) {
 	log.Printf("Joined channel %s.", config.Channel)
-	untappdFunc := func() {
-		log.Printf("Starting untappd event loop.")
-		go untappdLoop(s)
-	}
-
-	once.Do(untappdFunc)
 }
 
-func pushMessage(s ircx.Sender, cs chan string, channelName string) {
+func pushMessage(bot *ircx.Bot, cs chan string, channelName string) {
 	// Avoid message flooding the irc server by waiting
 	// two seconds between messages
 	throttle := time.Tick(2 * time.Second)
@@ -140,10 +138,12 @@ func pushMessage(s ircx.Sender, cs chan string, channelName string) {
 		select {
 		case message := <-cs:
 			<-throttle
-			s.Send(&irc.Message{
-				Command: irc.PRIVMSG,
-				Params:  []string{channelName, message},
-			})
+			if bot.Sender != nil {
+				bot.Sender.Send(&irc.Message{
+					Command: irc.PRIVMSG,
+					Params:  []string{channelName, message},
+				})
+			}
 		}
 	}
 }
@@ -288,8 +288,6 @@ func getCheckins(userName string, client *untappd.Client) []*untappd.Checkin {
 			return checkins
 		}
 	}
-
-	return nil
 }
 
 func getUserStats(checkins []*untappd.Checkin) (int, float64, float64) {
@@ -317,7 +315,9 @@ func (b byCheckinTime) Len() int               { return len(b) }
 func (b byCheckinTime) Less(i int, j int) bool { return b[i].Created.Before(b[j].Created) }
 func (b byCheckinTime) Swap(i int, j int)      { b[i], b[j] = b[j], b[i] }
 
-func untappdLoop(s ircx.Sender) {
+func untappdLoop(ircMessages chan string) {
+
+	log.Printf("Starting untappd event loop.")
 	client, err := untappd.NewClient(
 		config.ClientId,
 		config.ClientSecret,
@@ -330,10 +330,6 @@ func untappdLoop(s ircx.Sender) {
 
 	pollInterval := calculatePollInterval(len(config.Users))
 	log.Printf("Polling interval: %d min", pollInterval)
-
-	// Channel for messages to be pushed to irc
-	ircMessages := make(chan string, 30)
-	go pushMessage(s, ircMessages, config.Channel)
 
 	// Generate map of checkins for each user
 	userCheckins := make(map[string][]*untappd.Checkin)
